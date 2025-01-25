@@ -69,4 +69,5 @@ int wmain(void)
     }
 
     std::wcerr << L"Failed to monitor directory: " << GetLastError() << std::endl;
+    return 0;
 }
