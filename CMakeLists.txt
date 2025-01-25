@@ -4,4 +4,7 @@ project(TelegramDrive)
 set(CMAKE_CXX_STANDARD 17)
 
 include_directories(include)
-add_executable(TelegramDrive src/main.cpp)
+
+file(GLOB SRC_FILES src/*.cpp)
+
+add_executable(TelegramDrive ${SRC_FILES})
