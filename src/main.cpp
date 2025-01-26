@@ -1,9 +1,10 @@
-#include <utils.h>
+#include <windows.h>
 #include <cfapi.h>
 #include <corecrt_io.h>
 #include <fcntl.h>
 #include <iostream>
 #include <thread>
+#include <utils.h>
 
 #pragma comment(lib, "CldApi.lib")
 
@@ -17,10 +18,11 @@ bool RegisterSyncRoot()
   Reg.ProviderName = L"TelegramDrive";
   Reg.ProviderVersion = L"1.0";
 
-  GUID ProviderGuid = {0xa2572f01,
-                       0x5f92,
-                       0x4d7d,
-                       {0xaa, 0xe0, 0x31, 0xfa, 0xb4, 0x39, 0x10, 0x30}};
+  GUID ProviderGuid = {
+      0xa2572f01,
+      0x5f92,
+      0x4d7d,
+      {0xaa, 0xe0, 0x31, 0xfa, 0xb4, 0x39, 0x10, 0x30}};
 
   Reg.ProviderId = ProviderGuid;
 
@@ -30,18 +32,19 @@ bool RegisterSyncRoot()
 
   DWORD RegisterFlags = CF_REGISTER_FLAG_DISABLE_ON_DEMAND_POPULATION_ON_ROOT;
 
-  HRESULT Result = CfRegisterSyncRoot(DirectoryPath, &Reg, &Policies,
-                                      (CF_REGISTER_FLAGS)RegisterFlags);
+  HRESULT Result = CfRegisterSyncRoot(
+      DirectoryPath,
+      &Reg,
+      &Policies,
+      (CF_REGISTER_FLAGS)RegisterFlags);
 
   if (FAILED(Result))
   {
-    std::wcerr << L"[RegisterSyncRoot] failed, hr=0x" << std::hex << Result
-               << std::endl;
+    std::wcerr << L"[RegisterSyncRoot] failed, hr=0x" << std::hex << Result << std::endl;
     return false;
   }
 
-  std::wcout << L"[INFO] Sync root registered (root on-demand enumeration "
-                L"disabled).\n";
+  std::wcout << L"[INFO] Sync root registered (root on-demand enumeration disabled).\n";
   return true;
 }
 
@@ -51,13 +54,16 @@ bool ConnectSyncRoot()
 
   CF_CONNECT_FLAGS ConnectFlags = CF_CONNECT_FLAG_NONE;
 
-  HRESULT Result = CfConnectSyncRoot(DirectoryPath, Callbacks, nullptr,
-                                     ConnectFlags, &ConnectionKey);
+  HRESULT Result = CfConnectSyncRoot(
+      DirectoryPath,
+      Callbacks,
+      nullptr,
+      ConnectFlags,
+      &ConnectionKey);
 
   if (FAILED(Result))
   {
-    std::wcerr << L"[ConnectSyncRoot] failed, hr=0x" << std::hex << Result
-               << std::endl;
+    std::wcerr << L"[ConnectSyncRoot] failed, hr=0x" << std::hex << Result << std::endl;
     return false;
   }
 
@@ -70,8 +76,7 @@ void DisconnectSyncRoot()
   HRESULT Result = CfDisconnectSyncRoot(ConnectionKey);
   if (FAILED(Result))
   {
-    std::wcerr << L"[DisconnectSyncRoot] failed, hr=0x" << std::hex << Result
-               << std::endl;
+    std::wcerr << L"[DisconnectSyncRoot] failed, hr=0x" << std::hex << Result << std::endl;
   }
   else
   {
@@ -86,8 +91,7 @@ void UnregisterSyncRoot()
 
   if (FAILED(Result))
   {
-    std::wcerr << L"[UnregisterSyncRoot] failed, hr=0x" << std::hex << Result
-               << std::endl;
+    std::wcerr << L"[UnregisterSyncRoot] failed, hr=0x" << std::hex << Result << std::endl;
   }
   else
   {
@@ -111,8 +115,12 @@ bool CreateHelloWorldPlaceholder(int i)
   Placeholder.FileIdentity = Id;
   Placeholder.FileIdentityLength = (DWORD)sizeof(Id);
 
-  HRESULT Result = CfCreatePlaceholders(DirectoryPath, &Placeholder, 1,
-                                        CF_CREATE_FLAG_NONE, nullptr);
+  HRESULT Result = CfCreatePlaceholders(
+      DirectoryPath,
+      &Placeholder,
+      1,
+      CF_CREATE_FLAG_NONE,
+      nullptr);
 
   if (FAILED(Result))
   {
@@ -122,7 +130,8 @@ bool CreateHelloWorldPlaceholder(int i)
     return false;
   }
 
-  std::wcout << L"[INFO] Placeholder " << Placeholder.RelativeFileName
+  std::wcout << L"[INFO] Placeholder "
+             << Placeholder.RelativeFileName
              << " created.\n";
   return true;
 }
@@ -135,16 +144,19 @@ int wmain(void)
   {
     if (GetLastError() != ERROR_ALREADY_EXISTS)
     {
-      std::cerr << "Failed to create directory: " << GetLastError()
-                << std::endl;
+      std::cerr << "Failed to create directory: " << GetLastError() << std::endl;
       return 1;
     }
   }
 
   HANDLE DirectoryHandle = CreateFileW(
-      DirectoryPath, FILE_LIST_DIRECTORY,
-      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
-      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
+      DirectoryPath,
+      FILE_LIST_DIRECTORY,
+      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+      NULL,
+      OPEN_EXISTING,
+      FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
+      NULL);
 
   if (DirectoryHandle == INVALID_HANDLE_VALUE)
   {
@@ -180,11 +192,16 @@ int wmain(void)
   DWORD BytesReturned;
 
   while (ReadDirectoryChangesW(
-      DirectoryHandle, Buffer, BufferSize, FALSE,
+      DirectoryHandle,
+      Buffer,
+      BufferSize,
+      FALSE,
       FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
           FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_SIZE |
           FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION,
-      &BytesReturned, NULL, NULL))
+      &BytesReturned,
+      NULL,
+      NULL))
   {
     std::wcout << L"Changes detected\n";
     FILE_NOTIFY_INFORMATION *Notification = (FILE_NOTIFY_INFORMATION *)Buffer;

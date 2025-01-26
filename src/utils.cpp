@@ -8,17 +8,19 @@ NextNotification(FILE_NOTIFY_INFORMATION *Notification)
     return NULL;
   }
 
-  return (FILE_NOTIFY_INFORMATION *)((char *)Notification +
-                                     Notification->NextEntryOffset);
+  return (FILE_NOTIFY_INFORMATION *)((char *)Notification + Notification->NextEntryOffset);
 }
 
-std::wstring GetFileName(FILE_NOTIFY_INFORMATION *Notification)
+std::wstring
+GetFileName(FILE_NOTIFY_INFORMATION *Notification)
 {
-  return std::wstring(Notification->FileName,
-                      Notification->FileNameLength / sizeof(wchar_t));
+  return std::wstring(
+      Notification->FileName,
+      Notification->FileNameLength / sizeof(wchar_t));
 }
 
-std::wstring GetAction(DWORD Action)
+std::wstring
+GetAction(DWORD Action)
 {
   switch (Action)
   {
