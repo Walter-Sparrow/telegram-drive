@@ -175,22 +175,11 @@ int wmain(void)
     return 1;
   }
 
-  std::thread PlaceholderThread([]
-                                {
-    for (int i = 0; i < 10; i++) {
-      std::this_thread::sleep_for(std::chrono::seconds(1));
-      if (!CreateHelloWorldPlaceholder(i)) {
-        DisconnectSyncRoot();
-        UnregisterSyncRoot();
-      }
-    } });
-
   std::wcout << L"Monitoring directory: " << DirectoryPath << "\n";
 
   const DWORD BufferSize = 1024;
   BYTE Buffer[BufferSize];
   DWORD BytesReturned;
-
   while (ReadDirectoryChangesW(
       DirectoryHandle,
       Buffer,
@@ -216,9 +205,7 @@ int wmain(void)
       Notification = NextNotification(Notification);
     } while (Notification);
   }
-
   std::wcerr << L"Failed to monitor directory: " << GetLastError() << std::endl;
 
-  PlaceholderThread.join();
   return 0;
 }
