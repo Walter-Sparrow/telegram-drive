@@ -8,10 +8,6 @@
 FILE_NOTIFY_INFORMATION *
 NextNotification(FILE_NOTIFY_INFORMATION *Notification);
 
-std::wstring
-GetFileName(FILE_NOTIFY_INFORMATION *Notification);
-
-std::wstring
-GetAction(DWORD Action);
+const wchar_t *GetAction(DWORD Action);
 
 #endif

@@ -11,19 +11,16 @@
 const wchar_t *DirectoryPath = L"C:\\TelegramDrive";
 CF_CONNECTION_KEY ConnectionKey = {0};
 
-bool RegisterSyncRoot()
-{
+bool RegisterSyncRoot() {
   CF_SYNC_REGISTRATION Reg = {};
   Reg.StructSize = sizeof(Reg);
   Reg.ProviderName = L"TelegramDrive";
   Reg.ProviderVersion = L"1.0";
 
-  GUID ProviderGuid = {
-      0xa2572f01,
-      0x5f92,
-      0x4d7d,
-      {0xaa, 0xe0, 0x31, 0xfa, 0xb4, 0x39, 0x10, 0x30}};
-
+  GUID ProviderGuid = {0xa2572f01,
+                       0x5f92,
+                       0x4d7d,
+                       {0xaa, 0xe0, 0x31, 0xfa, 0xb4, 0x39, 0x10, 0x30}};
   Reg.ProviderId = ProviderGuid;
 
   CF_SYNC_POLICIES Policies = {};
@@ -31,76 +28,53 @@ bool RegisterSyncRoot()
   Policies.HardLink = CF_HARDLINK_POLICY_NONE;
 
   DWORD RegisterFlags = CF_REGISTER_FLAG_DISABLE_ON_DEMAND_POPULATION_ON_ROOT;
+  HRESULT Result = CfRegisterSyncRoot(DirectoryPath, &Reg, &Policies,
+                                      (CF_REGISTER_FLAGS)RegisterFlags);
 
-  HRESULT Result = CfRegisterSyncRoot(
-      DirectoryPath,
-      &Reg,
-      &Policies,
-      (CF_REGISTER_FLAGS)RegisterFlags);
-
-  if (FAILED(Result))
-  {
-    std::wcerr << L"[RegisterSyncRoot] failed, hr=0x" << std::hex << Result << std::endl;
+  if (FAILED(Result)) {
+    OutputDebugStringW(L"[RegisterSyncRoot] failed\n");
     return false;
   }
 
-  std::wcout << L"[INFO] Sync root registered (root on-demand enumeration disabled).\n";
+  OutputDebugStringW(L"[RegisterSyncRoot] succeeded\n");
   return true;
 }
 
-bool ConnectSyncRoot()
-{
+bool ConnectSyncRoot() {
   CF_CALLBACK_REGISTRATION Callbacks[] = {{CF_CALLBACK_TYPE_NONE, nullptr}};
-
   CF_CONNECT_FLAGS ConnectFlags = CF_CONNECT_FLAG_NONE;
+  HRESULT Result = CfConnectSyncRoot(DirectoryPath, Callbacks, nullptr,
+                                     ConnectFlags, &ConnectionKey);
 
-  HRESULT Result = CfConnectSyncRoot(
-      DirectoryPath,
-      Callbacks,
-      nullptr,
-      ConnectFlags,
-      &ConnectionKey);
-
-  if (FAILED(Result))
-  {
-    std::wcerr << L"[ConnectSyncRoot] failed, hr=0x" << std::hex << Result << std::endl;
+  if (FAILED(Result)) {
+    OutputDebugStringW(L"[ConnectSyncRoot] failed\n");
     return false;
   }
 
-  std::wcout << L"[INFO] Connected to sync root. CF_CONNECTION_KEY acquired.\n";
+  OutputDebugStringW(L"[ConnectSyncRoot] succeeded\n");
   return true;
 }
 
-void DisconnectSyncRoot()
-{
+void DisconnectSyncRoot() {
   HRESULT Result = CfDisconnectSyncRoot(ConnectionKey);
-  if (FAILED(Result))
-  {
-    std::wcerr << L"[DisconnectSyncRoot] failed, hr=0x" << std::hex << Result << std::endl;
-  }
-  else
-  {
-    std::wcout << L"[INFO] Disconnected sync root.\n";
+  if (FAILED(Result)) {
+    OutputDebugStringW(L"[DisconnectSyncRoot] failed\n");
+  } else {
+    OutputDebugStringW(L"[DisconnectSyncRoot] succeeded\n");
   }
   ConnectionKey.Internal = 0;
 }
 
-void UnregisterSyncRoot()
-{
+void UnregisterSyncRoot() {
   HRESULT Result = CfUnregisterSyncRoot(DirectoryPath);
-
-  if (FAILED(Result))
-  {
-    std::wcerr << L"[UnregisterSyncRoot] failed, hr=0x" << std::hex << Result << std::endl;
-  }
-  else
-  {
-    std::wcout << L"[INFO] Sync root unregistered.\n";
+  if (FAILED(Result)) {
+    OutputDebugStringW(L"[UnregisterSyncRoot] failed\n");
+  } else {
+    OutputDebugStringW(L"[UnregisterSyncRoot] succeeded\n");
   }
 }
 
-bool CreateHelloWorldPlaceholder(int i)
-{
+bool CreateHelloWorldPlaceholder(int i) {
   CF_PLACEHOLDER_CREATE_INFO Placeholder = {};
 
   std::wstring FileName = L"HelloWorld";
@@ -115,97 +89,76 @@ bool CreateHelloWorldPlaceholder(int i)
   Placeholder.FileIdentity = Id;
   Placeholder.FileIdentityLength = (DWORD)sizeof(Id);
 
-  HRESULT Result = CfCreatePlaceholders(
-      DirectoryPath,
-      &Placeholder,
-      1,
-      CF_CREATE_FLAG_NONE,
-      nullptr);
+  HRESULT Result = CfCreatePlaceholders(DirectoryPath, &Placeholder, 1,
+                                        CF_CREATE_FLAG_NONE, nullptr);
 
-  if (FAILED(Result))
-  {
-    std::wcerr
-        << L"[CreateHelloWorldPlaceholder] CfCreatePlaceholders failed, hr=0x"
-        << std::hex << Result << std::endl;
+  if (FAILED(Result)) {
+    OutputDebugStringW(L"[CreateHelloWorldPlaceholder] failed\n");
     return false;
   }
 
-  std::wcout << L"[INFO] Placeholder "
-             << Placeholder.RelativeFileName
-             << " created.\n";
+  OutputDebugStringW(L"[CreateHelloWorldPlaceholder] succeeded\n");
   return true;
 }
 
-int wmain(void)
-{
+int wmain(void) {
   _setmode(_fileno(stdout), _O_U16TEXT);
 
-  if (!CreateDirectoryW(DirectoryPath, NULL))
-  {
-    if (GetLastError() != ERROR_ALREADY_EXISTS)
-    {
-      std::cerr << "Failed to create directory: " << GetLastError() << std::endl;
+  if (!CreateDirectoryW(DirectoryPath, NULL)) {
+    if (GetLastError() != ERROR_ALREADY_EXISTS) {
+      OutputDebugStringW(L"[CreateDirectory] failed\n");
       return 1;
     }
   }
 
   HANDLE DirectoryHandle = CreateFileW(
-      DirectoryPath,
-      FILE_LIST_DIRECTORY,
-      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-      NULL,
-      OPEN_EXISTING,
-      FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
-      NULL);
+      DirectoryPath, FILE_LIST_DIRECTORY,
+      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
 
-  if (DirectoryHandle == INVALID_HANDLE_VALUE)
-  {
-    std::cerr << "Failed to create directory: " << GetLastError() << std::endl;
+  if (DirectoryHandle == INVALID_HANDLE_VALUE) {
+    OutputDebugStringW(L"[CreateFile] failed\n");
     return 1;
   }
 
-  if (!RegisterSyncRoot())
-  {
+  if (!RegisterSyncRoot()) {
     return 1;
   }
 
-  if (!ConnectSyncRoot())
-  {
+  if (!ConnectSyncRoot()) {
     UnregisterSyncRoot();
     return 1;
   }
 
-  std::wcout << L"Monitoring directory: " << DirectoryPath << "\n";
+  OutputDebugStringW(L"[Monitoring directory]\n");
 
   const DWORD BufferSize = 1024;
   BYTE Buffer[BufferSize];
   DWORD BytesReturned;
   while (ReadDirectoryChangesW(
-      DirectoryHandle,
-      Buffer,
-      BufferSize,
-      FALSE,
+      DirectoryHandle, Buffer, BufferSize, FALSE,
       FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
           FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_SIZE |
           FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION,
-      &BytesReturned,
-      NULL,
-      NULL))
-  {
-    std::wcout << L"Changes detected\n";
+      &BytesReturned, NULL, NULL)) {
+    OutputDebugStringW(L"[ReadDirectoryChanges] change detected\n");
     FILE_NOTIFY_INFORMATION *Notification = (FILE_NOTIFY_INFORMATION *)Buffer;
-    do
-    {
-      std::wstring Action = GetAction(Notification->Action);
-      std::wstring FileName = GetFileName(Notification);
+    do {
+      const wchar_t *Action = GetAction(Notification->Action);
+      const wchar_t *FileName = Notification->FileName;
 
-      std::wcout << L"File: " << FileName << "\n";
-      std::wcout << L"Action: " << Action << "\n";
+      wchar_t buffer[MAX_PATH];
+      swprintf(buffer, MAX_PATH, L"File: %.*s\n",
+               int(Notification->FileNameLength / sizeof(wchar_t)), FileName);
+      OutputDebugStringW(buffer);
+
+      swprintf(buffer, MAX_PATH, L"Action: %s\n", Action);
+      OutputDebugStringW(buffer);
 
       Notification = NextNotification(Notification);
     } while (Notification);
   }
-  std::wcerr << L"Failed to monitor directory: " << GetLastError() << std::endl;
 
+  OutputDebugStringW(L"[ReadDirectoryChanges] failed\n");
   return 0;
 }

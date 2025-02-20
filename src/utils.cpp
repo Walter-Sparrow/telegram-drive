@@ -1,29 +1,17 @@
 #include "utils.h"
 
 FILE_NOTIFY_INFORMATION *
-NextNotification(FILE_NOTIFY_INFORMATION *Notification)
-{
-  if (Notification->NextEntryOffset == 0)
-  {
+NextNotification(FILE_NOTIFY_INFORMATION *Notification) {
+  if (Notification->NextEntryOffset == 0) {
     return NULL;
   }
 
-  return (FILE_NOTIFY_INFORMATION *)((char *)Notification + Notification->NextEntryOffset);
+  return (FILE_NOTIFY_INFORMATION *)((char *)Notification +
+                                     Notification->NextEntryOffset);
 }
 
-std::wstring
-GetFileName(FILE_NOTIFY_INFORMATION *Notification)
-{
-  return std::wstring(
-      Notification->FileName,
-      Notification->FileNameLength / sizeof(wchar_t));
-}
-
-std::wstring
-GetAction(DWORD Action)
-{
-  switch (Action)
-  {
+const wchar_t *GetAction(DWORD Action) {
+  switch (Action) {
   case FILE_ACTION_ADDED:
     return L"File added";
   case FILE_ACTION_REMOVED:
