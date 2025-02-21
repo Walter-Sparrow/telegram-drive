@@ -126,6 +126,34 @@ DWORD WINAPI MonitorDirectory(LPVOID Param) {
       swprintf(buffer, MAX_PATH, L"Action: %s\n", Action);
       OutputDebugStringW(buffer);
 
+      if (Notification->Action == FILE_ACTION_ADDED) {
+        wchar_t FilePath[MAX_PATH];
+        swprintf(FilePath, MAX_PATH, L"%s\\%.*s", DirectoryPath,
+                 int(Notification->FileNameLength / sizeof(wchar_t)), FileName);
+
+        Sleep(500);
+        HANDLE FileHandle = CreateFileW(
+            FilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
+
+        if (FileHandle == INVALID_HANDLE_VALUE) {
+          OutputDebugStringW(L"[CreateFile] failed\n");
+        } else {
+          OutputDebugStringW(L"[CreateFile] succeeded\n");
+
+          HRESULT Result = CfConvertToPlaceholder(
+              FileHandle, NULL, 0,
+              CF_CONVERT_FLAG_MARK_IN_SYNC | CF_CONVERT_FLAG_ALWAYS_FULL, NULL,
+              NULL);
+
+          if (FAILED(Result)) {
+            OutputDebugStringW(L"[CfConvertToPlaceholder] failed\n");
+          }
+
+          CloseHandle(FileHandle);
+        }
+      }
+
       Notification = NextNotification(Notification);
     } while (Notification);
   }
@@ -134,8 +162,8 @@ DWORD WINAPI MonitorDirectory(LPVOID Param) {
 }
 
 DWORD WINAPI TestPlaceholderLoop(LPVOID /* Param */) {
-  for (int i = 0; i < 100; i++) {
-    CreateHelloWorldPlaceholder(i);
+  for (int i = 0; i < 10; i++) {
+    // CreateHelloWorldPlaceholder(i);
     Sleep(1000);
   }
 
