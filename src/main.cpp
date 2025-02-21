@@ -77,11 +77,10 @@ void UnregisterSyncRoot() {
 bool CreateHelloWorldPlaceholder(int i) {
   CF_PLACEHOLDER_CREATE_INFO Placeholder = {};
 
-  std::wstring FileName = L"HelloWorld";
-  FileName.append(std::to_wstring(i));
-  FileName.append(L".txt");
+  wchar_t FileName[MAX_PATH];
+  swprintf(FileName, MAX_PATH, L"HelloWorld_%d.txt", i);
 
-  Placeholder.RelativeFileName = FileName.c_str();
+  Placeholder.RelativeFileName = FileName;
   Placeholder.FsMetadata.FileSize.QuadPart = 0;
   Placeholder.Flags = CF_PLACEHOLDER_CREATE_FLAG_NONE;
 
@@ -99,6 +98,48 @@ bool CreateHelloWorldPlaceholder(int i) {
 
   OutputDebugStringW(L"[CreateHelloWorldPlaceholder] succeeded\n");
   return true;
+}
+
+DWORD WINAPI MonitorDirectory(LPVOID Param) {
+  HANDLE Handle = (HANDLE)Param;
+  const DWORD BufferSize = 1024;
+  BYTE Buffer[BufferSize];
+  DWORD BytesReturned;
+
+  while (ReadDirectoryChangesW(
+      Handle, Buffer, BufferSize, FALSE,
+      FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
+          FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_SIZE |
+          FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION,
+      &BytesReturned, NULL, NULL)) {
+    OutputDebugStringW(L"[ReadDirectoryChanges] change detected\n");
+    FILE_NOTIFY_INFORMATION *Notification = (FILE_NOTIFY_INFORMATION *)Buffer;
+    do {
+      const wchar_t *Action = GetAction(Notification->Action);
+      const wchar_t *FileName = Notification->FileName;
+
+      wchar_t buffer[MAX_PATH];
+      swprintf(buffer, MAX_PATH, L"File: %.*s\n",
+               int(Notification->FileNameLength / sizeof(wchar_t)), FileName);
+      OutputDebugStringW(buffer);
+
+      swprintf(buffer, MAX_PATH, L"Action: %s\n", Action);
+      OutputDebugStringW(buffer);
+
+      Notification = NextNotification(Notification);
+    } while (Notification);
+  }
+
+  return 0;
+}
+
+DWORD WINAPI TestPlaceholderLoop(LPVOID /* Param */) {
+  for (int i = 0; i < 100; i++) {
+    CreateHelloWorldPlaceholder(i);
+    Sleep(1000);
+  }
+
+  return 0;
 }
 
 int wmain(void) {
@@ -131,34 +172,14 @@ int wmain(void) {
   }
 
   OutputDebugStringW(L"[Monitoring directory]\n");
+  HANDLE MonitorHandle =
+      CreateThread(NULL, 0, MonitorDirectory, (LPVOID)DirectoryHandle, 0, NULL);
 
-  const DWORD BufferSize = 1024;
-  BYTE Buffer[BufferSize];
-  DWORD BytesReturned;
-  while (ReadDirectoryChangesW(
-      DirectoryHandle, Buffer, BufferSize, FALSE,
-      FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
-          FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_SIZE |
-          FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION,
-      &BytesReturned, NULL, NULL)) {
-    OutputDebugStringW(L"[ReadDirectoryChanges] change detected\n");
-    FILE_NOTIFY_INFORMATION *Notification = (FILE_NOTIFY_INFORMATION *)Buffer;
-    do {
-      const wchar_t *Action = GetAction(Notification->Action);
-      const wchar_t *FileName = Notification->FileName;
+  HANDLE TestPlaceholdersHandle =
+      CreateThread(NULL, 0, TestPlaceholderLoop, NULL, 0, NULL);
 
-      wchar_t buffer[MAX_PATH];
-      swprintf(buffer, MAX_PATH, L"File: %.*s\n",
-               int(Notification->FileNameLength / sizeof(wchar_t)), FileName);
-      OutputDebugStringW(buffer);
+  HANDLE Handles[] = {MonitorHandle, TestPlaceholdersHandle};
+  WaitForMultipleObjects(2, Handles, TRUE, INFINITE);
 
-      swprintf(buffer, MAX_PATH, L"Action: %s\n", Action);
-      OutputDebugStringW(buffer);
-
-      Notification = NextNotification(Notification);
-    } while (Notification);
-  }
-
-  OutputDebugStringW(L"[ReadDirectoryChanges] failed\n");
   return 0;
 }
