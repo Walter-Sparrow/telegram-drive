@@ -41,7 +41,7 @@ bool RegisterSyncRoot() {
 }
 
 bool ConnectSyncRoot() {
-  CF_CALLBACK_REGISTRATION Callbacks[] = {{CF_CALLBACK_TYPE_NONE, nullptr}};
+  CF_CALLBACK_REGISTRATION Callbacks[] = {CF_CALLBACK_REGISTRATION_END};
   CF_CONNECT_FLAGS ConnectFlags = CF_CONNECT_FLAG_NONE;
   HRESULT Result = CfConnectSyncRoot(DirectoryPath, Callbacks, nullptr,
                                      ConnectFlags, &ConnectionKey);
@@ -84,7 +84,7 @@ bool CreateHelloWorldPlaceholder(int i) {
   Placeholder.FsMetadata.FileSize.QuadPart = 0;
   Placeholder.Flags = CF_PLACEHOLDER_CREATE_FLAG_NONE;
 
-  static const char Id[] = "HelloWorldID";
+  const char Id[] = "HelloWorldID";
   Placeholder.FileIdentity = Id;
   Placeholder.FileIdentityLength = (DWORD)sizeof(Id);
 
