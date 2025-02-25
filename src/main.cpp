@@ -27,7 +27,8 @@ bool RegisterSyncRoot() {
   Policies.StructSize = sizeof(Policies);
   Policies.HardLink = CF_HARDLINK_POLICY_NONE;
 
-  DWORD RegisterFlags = CF_REGISTER_FLAG_DISABLE_ON_DEMAND_POPULATION_ON_ROOT;
+  DWORD RegisterFlags = CF_REGISTER_FLAG_DISABLE_ON_DEMAND_POPULATION_ON_ROOT |
+                        CF_REGISTER_FLAG_UPDATE;
   HRESULT Result = CfRegisterSyncRoot(DirectoryPath, &Reg, &Policies,
                                       (CF_REGISTER_FLAGS)RegisterFlags);
 
@@ -126,32 +127,36 @@ DWORD WINAPI MonitorDirectory(LPVOID Param) {
       swprintf(buffer, MAX_PATH, L"Action: %s\n", Action);
       OutputDebugStringW(buffer);
 
+      wchar_t FilePath[MAX_PATH];
+      swprintf(FilePath, MAX_PATH, L"%s\\%.*s", DirectoryPath,
+               int(Notification->FileNameLength / sizeof(wchar_t)), FileName);
+
       if (Notification->Action == FILE_ACTION_ADDED) {
-        wchar_t FilePath[MAX_PATH];
-        swprintf(FilePath, MAX_PATH, L"%s\\%.*s", DirectoryPath,
-                 int(Notification->FileNameLength / sizeof(wchar_t)), FileName);
+        HANDLE FileHandle = CreateFileW(FilePath, 0, FILE_READ_DATA, NULL,
+                                        OPEN_EXISTING, 0, NULL);
 
-        Sleep(500);
-        HANDLE FileHandle = CreateFileW(
-            FilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
+        BYTE *FileIdentity = (BYTE *)FilePath;
+        DWORD FileIdentityLength = (DWORD)wcslen(FilePath) * sizeof(wchar_t);
 
-        if (FileHandle == INVALID_HANDLE_VALUE) {
-          OutputDebugStringW(L"[CreateFile] failed\n");
+        HRESULT Result = CfConvertToPlaceholder(
+            FileHandle, FileIdentity, FileIdentityLength,
+            CF_CONVERT_FLAG_DEHYDRATE | CF_CONVERT_FLAG_MARK_IN_SYNC |
+                CF_CONVERT_FLAG_FORCE_CONVERT_TO_CLOUD_FILE,
+            NULL, NULL);
+
+        wchar_t DebugBuffer[MAX_PATH];
+        if (FAILED(Result)) {
+          swprintf(DebugBuffer, MAX_PATH,
+                   L"CfConvertToPlaceholder failed with 0x%08X for file %s\n",
+                   Result, FileName);
+          OutputDebugStringW(DebugBuffer);
         } else {
-          OutputDebugStringW(L"[CreateFile] succeeded\n");
-
-          HRESULT Result = CfConvertToPlaceholder(
-              FileHandle, NULL, 0,
-              CF_CONVERT_FLAG_MARK_IN_SYNC | CF_CONVERT_FLAG_ALWAYS_FULL, NULL,
-              NULL);
-
-          if (FAILED(Result)) {
-            OutputDebugStringW(L"[CfConvertToPlaceholder] failed\n");
-          }
-
-          CloseHandle(FileHandle);
+          swprintf(DebugBuffer, MAX_PATH,
+                   L"CfConvertToPlaceholder succeeded for %s\n", FileName);
+          OutputDebugStringW(DebugBuffer);
         }
+
+        CloseHandle(FileHandle);
       }
 
       Notification = NextNotification(Notification);
