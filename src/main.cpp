@@ -5,6 +5,7 @@
 #include <iostream>
 #include <thread>
 #include <utils.h>
+#include <vector>
 
 #pragma comment(lib, "CldApi.lib")
 
@@ -41,8 +42,68 @@ bool RegisterSyncRoot() {
   return true;
 }
 
+// void CALLBACK
+// OnFetchData(const CF_CALLBACK_INFO *CallbackInfo,
+//             const CF_CALLBACK_PARAMETERS * /* CallbackParameters */) {
+//   CF_OPERATION_INFO OpInfo = {0};
+//   CF_OPERATION_PARAMETERS OpParams = {0};
+
+//   LARGE_INTEGER Offset = {0};
+//   BYTE Buffer[4] = {'T', 'e', 's', 't'};
+
+//   OpInfo.StructSize = sizeof(OpInfo);
+//   OpInfo.Type = CF_OPERATION_TYPE_TRANSFER_DATA;
+//   OpInfo.ConnectionKey = CallbackInfo->ConnectionKey;
+//   OpInfo.TransferKey = CallbackInfo->TransferKey;
+//   OpParams.ParamSize = sizeof(OpParams);
+//   OpParams.TransferData.CompletionStatus = S_OK;
+//   OpParams.TransferData.Offset = Offset;
+//   OpParams.TransferData.Buffer = Buffer;
+//   OpParams.TransferData.Length.QuadPart = sizeof(Buffer);
+
+//   HRESULT Result = CfExecute(&OpInfo, &OpParams);
+//   if (FAILED(Result)) {
+//     OutputDebugStringW(L"[OnFetchData] failed\n");
+//     wprintf(L"Error: %x\n", Result);
+//   }
+// }
+
+void CALLBACK OnFetchData(const CF_CALLBACK_INFO *CallbackInfo,
+                          const CF_CALLBACK_PARAMETERS *CallbackParameters) {
+  LARGE_INTEGER RequestOffset =
+      CallbackParameters->FetchData.RequiredFileOffset;
+  LARGE_INTEGER RequestLength = CallbackParameters->FetchData.RequiredLength;
+
+  BYTE *Buffer = (BYTE *)malloc(RequestLength.QuadPart);
+  for (int i = 0; i < RequestLength.QuadPart && i < 4; ++i) {
+    Buffer[i] = "Test"[i % 4];
+  }
+
+  CF_OPERATION_INFO OpInfo = {};
+  CF_OPERATION_PARAMETERS OpParams = {};
+
+  OpInfo.StructSize = sizeof(OpInfo);
+  OpInfo.Type = CF_OPERATION_TYPE_TRANSFER_DATA;
+  OpInfo.ConnectionKey = CallbackInfo->ConnectionKey;
+  OpInfo.TransferKey = CallbackInfo->TransferKey;
+
+  OpParams.ParamSize = sizeof(OpParams);
+  OpParams.TransferData.CompletionStatus = S_OK;
+  OpParams.TransferData.Offset = RequestOffset;
+  OpParams.TransferData.Length = RequestLength;
+  OpParams.TransferData.Buffer = Buffer;
+
+  HRESULT Result = CfExecute(&OpInfo, &OpParams);
+  if (FAILED(Result)) {
+    wprintf(L"[OnFetchData] CfExecute failed: 0x%08X\n", Result);
+  }
+
+  free(Buffer);
+}
+
 bool ConnectSyncRoot() {
-  CF_CALLBACK_REGISTRATION Callbacks[] = {CF_CALLBACK_REGISTRATION_END};
+  CF_CALLBACK_REGISTRATION Callbacks[] = {
+      {CF_CALLBACK_TYPE_FETCH_DATA, OnFetchData}, CF_CALLBACK_REGISTRATION_END};
   CF_CONNECT_FLAGS ConnectFlags = CF_CONNECT_FLAG_NONE;
   HRESULT Result = CfConnectSyncRoot(DirectoryPath, Callbacks, nullptr,
                                      ConnectFlags, &ConnectionKey);
