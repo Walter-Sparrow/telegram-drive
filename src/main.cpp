@@ -9,228 +9,162 @@
 
 #pragma comment(lib, "CldApi.lib")
 
-const wchar_t *DirectoryPath = L"C:\\TelegramDrive";
-CF_CONNECTION_KEY ConnectionKey = {0};
+const wchar_t *directory_path = L"C:\\TelegramDrive";
+CF_CONNECTION_KEY connection_key = {0};
 
-bool RegisterSyncRoot() {
-  CF_SYNC_REGISTRATION Reg = {};
-  Reg.StructSize = sizeof(Reg);
-  Reg.ProviderName = L"TelegramDrive";
-  Reg.ProviderVersion = L"1.0";
+bool register_sync_root() {
+  CF_SYNC_REGISTRATION reg = {};
+  reg.StructSize = sizeof(reg);
+  reg.ProviderName = L"TelegramDrive";
+  reg.ProviderVersion = L"1.0";
 
-  GUID ProviderGuid = {0xa2572f01,
-                       0x5f92,
-                       0x4d7d,
-                       {0xaa, 0xe0, 0x31, 0xfa, 0xb4, 0x39, 0x10, 0x30}};
-  Reg.ProviderId = ProviderGuid;
+  GUID provider_guid = {0xa2572f01,
+                        0x5f92,
+                        0x4d7d,
+                        {0xaa, 0xe0, 0x31, 0xfa, 0xb4, 0x39, 0x10, 0x30}};
+  reg.ProviderId = provider_guid;
 
-  CF_SYNC_POLICIES Policies = {};
-  Policies.StructSize = sizeof(Policies);
-  Policies.HardLink = CF_HARDLINK_POLICY_NONE;
+  CF_SYNC_POLICIES policies = {};
+  policies.StructSize = sizeof(policies);
+  policies.HardLink = CF_HARDLINK_POLICY_NONE;
 
   DWORD RegisterFlags = CF_REGISTER_FLAG_DISABLE_ON_DEMAND_POPULATION_ON_ROOT |
                         CF_REGISTER_FLAG_UPDATE;
-  HRESULT Result = CfRegisterSyncRoot(DirectoryPath, &Reg, &Policies,
+  HRESULT Result = CfRegisterSyncRoot(directory_path, &reg, &policies,
                                       (CF_REGISTER_FLAGS)RegisterFlags);
 
   if (FAILED(Result)) {
-    OutputDebugStringW(L"[RegisterSyncRoot] failed\n");
+    wprintf(L"[register_sync_root] failed: 0x%08X\n", Result);
     return false;
   }
 
-  OutputDebugStringW(L"[RegisterSyncRoot] succeeded\n");
+  wprintf(L"[register_sync_root] succeeded\n");
   return true;
 }
 
-// void CALLBACK
-// OnFetchData(const CF_CALLBACK_INFO *CallbackInfo,
-//             const CF_CALLBACK_PARAMETERS * /* CallbackParameters */) {
-//   CF_OPERATION_INFO OpInfo = {0};
-//   CF_OPERATION_PARAMETERS OpParams = {0};
+void CALLBACK on_fetch_data(const CF_CALLBACK_INFO *callback_info,
+                            const CF_CALLBACK_PARAMETERS *callback_parameters) {
+  LARGE_INTEGER request_offset =
+      callback_parameters->FetchData.RequiredFileOffset;
+  LARGE_INTEGER request_length = callback_parameters->FetchData.RequiredLength;
 
-//   LARGE_INTEGER Offset = {0};
-//   BYTE Buffer[4] = {'T', 'e', 's', 't'};
-
-//   OpInfo.StructSize = sizeof(OpInfo);
-//   OpInfo.Type = CF_OPERATION_TYPE_TRANSFER_DATA;
-//   OpInfo.ConnectionKey = CallbackInfo->ConnectionKey;
-//   OpInfo.TransferKey = CallbackInfo->TransferKey;
-//   OpParams.ParamSize = sizeof(OpParams);
-//   OpParams.TransferData.CompletionStatus = S_OK;
-//   OpParams.TransferData.Offset = Offset;
-//   OpParams.TransferData.Buffer = Buffer;
-//   OpParams.TransferData.Length.QuadPart = sizeof(Buffer);
-
-//   HRESULT Result = CfExecute(&OpInfo, &OpParams);
-//   if (FAILED(Result)) {
-//     OutputDebugStringW(L"[OnFetchData] failed\n");
-//     wprintf(L"Error: %x\n", Result);
-//   }
-// }
-
-void CALLBACK OnFetchData(const CF_CALLBACK_INFO *CallbackInfo,
-                          const CF_CALLBACK_PARAMETERS *CallbackParameters) {
-  LARGE_INTEGER RequestOffset =
-      CallbackParameters->FetchData.RequiredFileOffset;
-  LARGE_INTEGER RequestLength = CallbackParameters->FetchData.RequiredLength;
-
-  BYTE *Buffer = (BYTE *)malloc(RequestLength.QuadPart);
-  for (int i = 0; i < RequestLength.QuadPart && i < 4; ++i) {
-    Buffer[i] = "Test"[i % 4];
+  BYTE *buffer = (BYTE *)malloc(request_length.QuadPart);
+  for (int i = 0; i < request_length.QuadPart && i < 4; ++i) {
+    buffer[i] = "Test"[i % 4];
   }
 
-  CF_OPERATION_INFO OpInfo = {};
-  CF_OPERATION_PARAMETERS OpParams = {};
+  CF_OPERATION_INFO op_info = {};
+  CF_OPERATION_PARAMETERS op_params = {};
 
-  OpInfo.StructSize = sizeof(OpInfo);
-  OpInfo.Type = CF_OPERATION_TYPE_TRANSFER_DATA;
-  OpInfo.ConnectionKey = CallbackInfo->ConnectionKey;
-  OpInfo.TransferKey = CallbackInfo->TransferKey;
+  op_info.StructSize = sizeof(op_info);
+  op_info.Type = CF_OPERATION_TYPE_TRANSFER_DATA;
+  op_info.ConnectionKey = callback_info->ConnectionKey;
+  op_info.TransferKey = callback_info->TransferKey;
 
-  OpParams.ParamSize = sizeof(OpParams);
-  OpParams.TransferData.CompletionStatus = S_OK;
-  OpParams.TransferData.Offset = RequestOffset;
-  OpParams.TransferData.Length = RequestLength;
-  OpParams.TransferData.Buffer = Buffer;
+  op_params.ParamSize = sizeof(op_params);
+  op_params.TransferData.CompletionStatus = S_OK;
+  op_params.TransferData.Offset = request_offset;
+  op_params.TransferData.Length = request_length;
+  op_params.TransferData.Buffer = buffer;
 
-  HRESULT Result = CfExecute(&OpInfo, &OpParams);
-  if (FAILED(Result)) {
-    wprintf(L"[OnFetchData] CfExecute failed: 0x%08X\n", Result);
+  HRESULT hr = CfExecute(&op_info, &op_params);
+  if (FAILED(hr)) {
+    wprintf(L"[on_fetch_data] CfExecute failed: 0x%08X\n", hr);
   }
 
-  free(Buffer);
+  free(buffer);
 }
 
-bool ConnectSyncRoot() {
-  CF_CALLBACK_REGISTRATION Callbacks[] = {
-      {CF_CALLBACK_TYPE_FETCH_DATA, OnFetchData}, CF_CALLBACK_REGISTRATION_END};
-  CF_CONNECT_FLAGS ConnectFlags = CF_CONNECT_FLAG_NONE;
-  HRESULT Result = CfConnectSyncRoot(DirectoryPath, Callbacks, nullptr,
-                                     ConnectFlags, &ConnectionKey);
+bool connect_sync_root() {
+  CF_CALLBACK_REGISTRATION callbacks[] = {
+      {CF_CALLBACK_TYPE_FETCH_DATA, on_fetch_data},
+      CF_CALLBACK_REGISTRATION_END};
+  CF_CONNECT_FLAGS connect_flags = CF_CONNECT_FLAG_NONE;
+  HRESULT hr = CfConnectSyncRoot(directory_path, callbacks, NULL, connect_flags,
+                                 &connection_key);
 
-  if (FAILED(Result)) {
-    OutputDebugStringW(L"[ConnectSyncRoot] failed\n");
+  if (FAILED(hr)) {
+    wprintf(L"[connect_sync_root] failed: 0x%08X\n", hr);
     return false;
   }
 
-  OutputDebugStringW(L"[ConnectSyncRoot] succeeded\n");
+  wprintf(L"[connect_sync_root] succeeded\n");
   return true;
 }
 
-void DisconnectSyncRoot() {
-  HRESULT Result = CfDisconnectSyncRoot(ConnectionKey);
-  if (FAILED(Result)) {
-    OutputDebugStringW(L"[DisconnectSyncRoot] failed\n");
+void disconnect_sync_root() {
+  HRESULT hr = CfDisconnectSyncRoot(connection_key);
+  if (FAILED(hr)) {
+    wprintf(L"[disconnect_sync_root] failed: 0x%08X\n", hr);
   } else {
-    OutputDebugStringW(L"[DisconnectSyncRoot] succeeded\n");
+    wprintf(L"[disconnect_sync_root] succeeded\n");
   }
-  ConnectionKey.Internal = 0;
+  connection_key.Internal = 0;
 }
 
-void UnregisterSyncRoot() {
-  HRESULT Result = CfUnregisterSyncRoot(DirectoryPath);
-  if (FAILED(Result)) {
-    OutputDebugStringW(L"[UnregisterSyncRoot] failed\n");
+void unregister_sync_root() {
+  HRESULT hr = CfUnregisterSyncRoot(directory_path);
+  if (FAILED(hr)) {
+    wprintf(L"[unregister_sync_root] failed: 0x%08X\n", hr);
   } else {
-    OutputDebugStringW(L"[UnregisterSyncRoot] succeeded\n");
+    wprintf(L"[unregister_sync_root] succeeded\n");
   }
 }
 
-bool CreateHelloWorldPlaceholder(int i) {
-  CF_PLACEHOLDER_CREATE_INFO Placeholder = {};
+DWORD WINAPI monitor_directory(LPVOID param) {
+  HANDLE handle = (HANDLE)param;
+  const DWORD buffer_size = 1024;
+  BYTE buffer[buffer_size];
+  DWORD bytes_returned;
 
-  wchar_t FileName[MAX_PATH];
-  swprintf(FileName, MAX_PATH, L"HelloWorld_%d.txt", i);
-
-  Placeholder.RelativeFileName = FileName;
-  Placeholder.FsMetadata.FileSize.QuadPart = 0;
-  Placeholder.Flags = CF_PLACEHOLDER_CREATE_FLAG_NONE;
-
-  const char Id[] = "HelloWorldID";
-  Placeholder.FileIdentity = Id;
-  Placeholder.FileIdentityLength = (DWORD)sizeof(Id);
-
-  HRESULT Result = CfCreatePlaceholders(DirectoryPath, &Placeholder, 1,
-                                        CF_CREATE_FLAG_NONE, nullptr);
-
-  if (FAILED(Result)) {
-    OutputDebugStringW(L"[CreateHelloWorldPlaceholder] failed\n");
-    return false;
-  }
-
-  OutputDebugStringW(L"[CreateHelloWorldPlaceholder] succeeded\n");
-  return true;
-}
-
-DWORD WINAPI MonitorDirectory(LPVOID Param) {
-  HANDLE Handle = (HANDLE)Param;
-  const DWORD BufferSize = 1024;
-  BYTE Buffer[BufferSize];
-  DWORD BytesReturned;
-
+  wprintf(L"Monitoring directory...\n");
   while (ReadDirectoryChangesW(
-      Handle, Buffer, BufferSize, FALSE,
+      handle, buffer, buffer_size, FALSE,
       FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
           FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_SIZE |
           FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION,
-      &BytesReturned, NULL, NULL)) {
-    OutputDebugStringW(L"[ReadDirectoryChanges] change detected\n");
-    FILE_NOTIFY_INFORMATION *Notification = (FILE_NOTIFY_INFORMATION *)Buffer;
+      &bytes_returned, NULL, NULL)) {
+    wprintf(L"[monitor_directory] change detected\n");
+    FILE_NOTIFY_INFORMATION *notification = (FILE_NOTIFY_INFORMATION *)buffer;
     do {
-      const wchar_t *Action = GetAction(Notification->Action);
-      const wchar_t *FileName = Notification->FileName;
+      const wchar_t *action = GetAction(notification->Action);
+      const wchar_t *file_name = notification->FileName;
+      int file_name_length =
+          int(notification->FileNameLength / sizeof(wchar_t));
 
-      wchar_t buffer[MAX_PATH];
-      swprintf(buffer, MAX_PATH, L"File: %.*s\n",
-               int(Notification->FileNameLength / sizeof(wchar_t)), FileName);
-      OutputDebugStringW(buffer);
+      wprintf(L"[monitor_directory] action: \"%s\" on file: \"%.*s\"\n", action,
+              file_name_length, file_name);
 
-      swprintf(buffer, MAX_PATH, L"Action: %s\n", Action);
-      OutputDebugStringW(buffer);
+      wchar_t file_path[MAX_PATH];
+      swprintf(file_path, MAX_PATH, L"%s\\%.*s", directory_path,
+               file_name_length, file_name);
 
-      wchar_t FilePath[MAX_PATH];
-      swprintf(FilePath, MAX_PATH, L"%s\\%.*s", DirectoryPath,
-               int(Notification->FileNameLength / sizeof(wchar_t)), FileName);
+      if (notification->Action == FILE_ACTION_ADDED) {
+        HANDLE file_handle = CreateFileW(file_path, 0, FILE_READ_DATA, NULL,
+                                         OPEN_EXISTING, 0, NULL);
 
-      if (Notification->Action == FILE_ACTION_ADDED) {
-        HANDLE FileHandle = CreateFileW(FilePath, 0, FILE_READ_DATA, NULL,
-                                        OPEN_EXISTING, 0, NULL);
+        BYTE *file_identity = (BYTE *)file_path;
+        DWORD file_identity_length = (DWORD)wcslen(file_path) * sizeof(wchar_t);
 
-        BYTE *FileIdentity = (BYTE *)FilePath;
-        DWORD FileIdentityLength = (DWORD)wcslen(FilePath) * sizeof(wchar_t);
-
-        HRESULT Result = CfConvertToPlaceholder(
-            FileHandle, FileIdentity, FileIdentityLength,
+        HRESULT hr = CfConvertToPlaceholder(
+            file_handle, file_identity, file_identity_length,
             CF_CONVERT_FLAG_DEHYDRATE | CF_CONVERT_FLAG_MARK_IN_SYNC |
                 CF_CONVERT_FLAG_FORCE_CONVERT_TO_CLOUD_FILE,
             NULL, NULL);
 
-        wchar_t DebugBuffer[MAX_PATH];
-        if (FAILED(Result)) {
-          swprintf(DebugBuffer, MAX_PATH,
-                   L"CfConvertToPlaceholder failed with 0x%08X for file %s\n",
-                   Result, FileName);
-          OutputDebugStringW(DebugBuffer);
+        if (FAILED(hr)) {
+          wprintf(
+              L"[monitor_directory] CfConvertToPlaceholder failed: 0x%08X\n",
+              hr);
         } else {
-          swprintf(DebugBuffer, MAX_PATH,
-                   L"CfConvertToPlaceholder succeeded for %s\n", FileName);
-          OutputDebugStringW(DebugBuffer);
+          wprintf(L"[monitor_directory] CfConvertToPlaceholder succeeded\n");
         }
 
-        CloseHandle(FileHandle);
+        CloseHandle(file_handle);
       }
 
-      Notification = NextNotification(Notification);
-    } while (Notification);
-  }
-
-  return 0;
-}
-
-DWORD WINAPI TestPlaceholderLoop(LPVOID /* Param */) {
-  for (int i = 0; i < 10; i++) {
-    // CreateHelloWorldPlaceholder(i);
-    Sleep(1000);
+      notification = NextNotification(notification);
+    } while (notification);
   }
 
   return 0;
@@ -239,41 +173,38 @@ DWORD WINAPI TestPlaceholderLoop(LPVOID /* Param */) {
 int wmain(void) {
   _setmode(_fileno(stdout), _O_U16TEXT);
 
-  if (!CreateDirectoryW(DirectoryPath, NULL)) {
-    if (GetLastError() != ERROR_ALREADY_EXISTS) {
-      OutputDebugStringW(L"[CreateDirectory] failed\n");
+  if (!CreateDirectoryW(directory_path, NULL)) {
+    DWORD error = GetLastError();
+    if (error != ERROR_ALREADY_EXISTS) {
+      wprintf(L"[CreateDirectory] failed: 0x%08X\n", error);
       return 1;
     }
   }
 
-  HANDLE DirectoryHandle = CreateFileW(
-      DirectoryPath, FILE_LIST_DIRECTORY,
+  HANDLE directory_handle = CreateFileW(
+      directory_path, FILE_LIST_DIRECTORY,
       FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
       OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
 
-  if (DirectoryHandle == INVALID_HANDLE_VALUE) {
-    OutputDebugStringW(L"[CreateFile] failed\n");
+  if (directory_handle == INVALID_HANDLE_VALUE) {
+    wprintf(L"[CreateFile] failed: 0x%08X\n", GetLastError());
     return 1;
   }
 
-  if (!RegisterSyncRoot()) {
+  if (!register_sync_root()) {
     return 1;
   }
 
-  if (!ConnectSyncRoot()) {
-    UnregisterSyncRoot();
+  if (!connect_sync_root()) {
+    unregister_sync_root();
     return 1;
   }
 
-  OutputDebugStringW(L"[Monitoring directory]\n");
-  HANDLE MonitorHandle =
-      CreateThread(NULL, 0, MonitorDirectory, (LPVOID)DirectoryHandle, 0, NULL);
+  HANDLE monitor_handle = CreateThread(NULL, 0, monitor_directory,
+                                       (LPVOID)directory_handle, 0, NULL);
 
-  HANDLE TestPlaceholdersHandle =
-      CreateThread(NULL, 0, TestPlaceholderLoop, NULL, 0, NULL);
-
-  HANDLE Handles[] = {MonitorHandle, TestPlaceholdersHandle};
-  WaitForMultipleObjects(2, Handles, TRUE, INFINITE);
+  HANDLE handles[] = {monitor_handle};
+  WaitForMultipleObjects(1, handles, TRUE, INFINITE);
 
   return 0;
 }
